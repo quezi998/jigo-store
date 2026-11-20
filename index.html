@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><title>JIGO — ручки</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#000;--card:#111;--line:#262626;--tx:#f5f5f5;--mu:#8a8a8a;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:#000;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;padding:12px 16px}
+.logo{font-weight:800;letter-spacing:.35em;font-size:20px;cursor:pointer}
+header input{flex:1;min-width:0}
+input,select,textarea,button{font:inherit;color:var(--tx);background:#0b0b0b;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+button{cursor:pointer;background:#fff;color:#000;border:0;font-weight:600}
+button.g{background:#161616;color:var(--tx);border:1px solid var(--line)}
+button:disabled{opacity:.4;cursor:default}
+main{max-width:1000px;margin:0 auto;padding:16px}
+.hero{padding:28px 0 8px}.hero h1{font-size:clamp(28px,7vw,48px);margin:0 0 6px;letter-spacing:-.02em}.hero p{color:var(--mu);margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.pen{height:120px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#0a0a0a}
+.mu{color:var(--mu);font-size:14px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{flex:1}
+.drawer{position:fixed;inset:0;background:#000c;z-index:10;display:flex;justify-content:flex-end}
+.panel{width:min(420px,100%);background:#0a0a0a;border-left:1px solid var(--line);padding:16px;overflow:auto;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.panel input,.panel textarea{width:100%;margin:4px 0}
+.item{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:8px;margin:12px 0}.tabs button{background:#161616;color:var(--tx)}.tabs button.on{background:#fff;color:#000}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+.tag{display:inline-block;padding:2px 10px;border-radius:99px;border:1px solid var(--line);font-size:13px}
+.ovf{overflow-x:auto}.ovf table{border-collapse:collapse;width:100%;min-width:640px}.ovf td,.ovf th{padding:6px;text-align:left;border-bottom:1px solid var(--line)}.ovf input,.ovf select{width:100%}
+.err{background:#2a0d0d;border:1px solid #5c1a1a;border-radius:10px;padding:10px;margin:10px 0}
+.code{font-size:30px;font-weight:800;letter-spacing:.12em;margin:10px 0}
+</style></head><body>
+<header><span class="logo" onclick="go('')">JIGO</span><input id="q" placeholder="Поиск ручек…" oninput="S.q=this.value;view()"><button class="g" id="adm" style="display:none" onclick="go('admin')">Админ</button><button id="cartb" onclick="openCart()">Корзина</button></header>
+<main id="app"></main><div id="dr"></div>
+<script>
+const COL={pink:['Розовая','#ff8fc7'],lavender:['Лаванда','#b9a0ff'],mint:['Мятная','#7ff0c8'],yellow:['Жёлтая','#ffe566']};
+const ST={new:'Новая',confirmed:'Подтверждена',ready:'Готова к выдаче',done:'Выдана',cancelled:'Отменена'};
+const S={products:[],res:[],orders:[],om:{},subs:{},user:null,cart:{},q:'',tab:'orders',oq:'',admin:false,db:null,err:'',loaded:false,ok:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>Number(n||0).toLocaleString('ru-RU')+' ₸';
+const pen=c=>`<svg width="120" height="110" viewBox="0 0 120 110"><g transform="rotate(-35 60 55)"><rect x="12" y="46" width="78" height="18" rx="9" fill="${c}"/><rect x="82" y="46" width="14" height="18" fill="#222"/><path d="M96 46l16 9-16 9z" fill="${c}"/><rect x="24" y="50" width="30" height="3" rx="1.5" fill="#fff" opacity=".5"/></g></svg>`;
+function go(h){location.hash=h}
+addEventListener('hashchange',view);
+function reserved(pid){const p=S.products.find(x=>x.id===pid);return p?p.reserved||0:0}
+function avail(p){return Math.max(0,(p.stock||0)-reserved(p.id))}
+function ords(){return S.orders}
+function view(){
+  const a=$('app');$('adm').style.display=S.admin?'':'none';
+  const n=Object.values(S.cart).reduce((a,b)=>a+b,0);$('cartb').textContent='Корзина'+(n?` (${n})`:'');
+  if(location.hash==='#admin'){return S.admin?adminView(a):a.innerHTML='<div class="box" style="max-width:360px"><h2>Вход владельца</h2><input id="lp" type="password" placeholder="Пароль" style="width:100%;margin-bottom:8px" onkeydown="if(event.key===\'Enter\')login()"><button style="width:100%" onclick="login()">Войти</button><div id="le"></div></div>'}
+  if(S.ok){a.innerHTML=`<div class="box"><h2>Бронь принята</h2><div class="mu">Номер вашей брони</div><div class="code">${esc(S.ok)}</div><p class="mu">Сохраните номер: по нему владелец найдёт вашу бронь.</p><button onclick="S.ok=null;view()">В каталог</button></div>`;return}
+  const t=S.q.trim().toLowerCase();
+  const list=S.products.filter(p=>p.active!==false&&(!t||(p.name+' '+(COL[p.color]||[''])[0]).toLowerCase().includes(t)));
+  const tot=S.products.filter(p=>p.active!==false).reduce((s,p)=>s+avail(p),0);
+  a.innerHTML=(S.err?`<div class="err">${esc(S.err)}</div>`:'')+`<div class="hero"><h1>Ручки JIGO</h1><p>Четыре цвета. Минимум шума. В наличии: ${tot} шт.</p></div><div class="grid">`+
+  (list.length?list.map(p=>{const av=avail(p),c=(COL[p.color]||['',  '#fff'])[1],inc=S.cart[p.id]||0;
+   return `<div class="card"><div class="pen">${pen(c)}</div><b>${esc(p.name)}</b><div class="row"><span>${money(p.price)}</span><span class="sp"></span><span class="mu">${av?`Осталось ${av}`:'Нет в наличии'}</span></div><button ${av<=inc?'disabled':''} onclick="add('${esc(p.id)}')">${av<=inc&&av?'Максимум в корзине':'В корзину'}</button></div>`}).join(''):`<p class="mu">${S.loaded?'Ничего не найдено':'Загрузка…'}</p>`)+'</div>';
+}
+function add(id){const p=S.products.find(x=>x.id===id);if(p&&(S.cart[id]||0)<avail(p)){S.cart[id]=(S.cart[id]||0)+1;view()}}
+function openCart(){
+  const ids=Object.keys(S.cart).filter(i=>S.products.find(p=>p.id===i)),d=$('dr');
+  let tot=0;const rows=ids.map(i=>{const p=S.products.find(x=>x.id===i);tot+=p.price*S.cart[i];return `<div class="item"><span style="color:${(COL[p.color]||['','#fff'])[1]}">●</span><span class="sp">${esc(p.name)}<br><span class="mu">${money(p.price)}</span></span><button class="g" onclick="chg('${esc(i)}',-1)">−</button>${S.cart[i]}<button class="g" onclick="chg('${esc(i)}',1)">+</button></div>`}).join('');
+  d.innerHTML=`<div class="drawer" onclick="if(event.target===this)closeCart()"><div class="panel"><div class="row"><h2 class="sp" style="margin:0">Корзина</h2><button class="g" onclick="closeCart()">✕</button></div>${rows||'<p class="mu">Корзина пуста</p>'}${ids.length?`<p><b>Итого: ${money(tot)}</b></p><p class="mu">Оплата при получении. Бронь действует до подтверждения владельцем.</p><input id="cn" placeholder="Ваше имя"><input id="cp" placeholder="Телефон" inputmode="tel"><textarea id="cc" rows="2" placeholder="Комментарий (необязательно)"></textarea><div id="ce"></div><button id="cb" style="width:100%" onclick="checkout()">Забронировать</button>`:''}</div></div>`;
+}
+function closeCart(){$('dr').innerHTML=''}
+function chg(i,d){const p=S.products.find(x=>x.id===i);const n=(S.cart[i]||0)+d;if(n<=0)delete S.cart[i];else if(n<=avail(p))S.cart[i]=n;openCart();view()}
+async function checkout(){
+  const name=$('cn').value.trim(),phone=$('cp').value.trim(),com=$('cc').value.trim(),e=$('ce');
+  if(name.length<2||phone.replace(/\D/g,'').length<6){e.innerHTML='<div class="err">Укажите имя и телефон</div>';return}
+  $('cb').disabled=true;
+  try{const r=await api('reserve',{name,phone,comment:com,items:Object.entries(S.cart).map(([pid,qty])=>({pid,qty}))});
+    S.cart={};S.ok=r.code;closeCart();await loadState();view()}
+  catch(x){$('cb').disabled=false;e.innerHTML=`<div class="err">${esc(x.message)}</div>`;loadState()}
+}
+/* ---------- admin ---------- */
+function adminView(a){
+  a.innerHTML=`<div class="row"><h2 class="sp">Админ-панель</h2><button class="g" onclick="logout()">Выйти</button></div><div class="tabs"><button class="${S.tab==='orders'?'on':''}" onclick="S.tab='orders';view()">Заказы (${ords().length})</button><button class="${S.tab==='products'?'on':''}" onclick="S.tab='products';view()">Товары</button></div><div id="ab"></div>`;
+  const b=$('ab');
+  if(S.tab==='orders'){
+    const t=S.oq.trim().toLowerCase();
+    const l=ords().filter(o=>!t||(o.code+' '+o.name+' '+o.phone).toLowerCase().includes(t)).sort((x,y)=>y.ts-x.ts);
+    b.innerHTML=`<input id="oq" style="width:100%" placeholder="Поиск: номер брони, имя, телефон" value="${esc(S.oq)}">`+(l.map(o=>`<div class="box"><div class="row"><b>${esc(o.code)}</b><span class="tag">${ST[o.status]||o.status}</span><span class="sp"></span><span class="mu">${new Date(o.ts).toLocaleString('ru-RU')}</span></div><div>${esc(o.name)} · ${esc(o.phone)}</div>${o.comment?`<div class="mu">${esc(o.comment)}</div>`:''}<div class="mu">${(o.items||[]).map(i=>esc(i.name)+' × '+i.qty).join(', ')}</div><div class="row"><b>${money(o.total)}</b><span class="sp"></span><select onchange="setSt('${esc(o.code)}',this.value)">${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${k===o.status?'selected':''}>${v}</option>`).join('')}</select></div></div>`).join('')||'<p class="mu">Заказов нет</p>');
+    const i=$('oq');i.oninput=()=>{S.oq=i.value;const p=i.selectionStart;adminView(a);const n=$('oq');n.focus();n.setSelectionRange(p,p)};
+  }else{
+    b.innerHTML=(S.products.length?'':`<div class="box"><p>Товаров пока нет.</p><button onclick="seed()">Создать начальные товары (22 шт.)</button></div>`)+
+    `<div class="ovf"><table><tr><th>Название</th><th>Цвет</th><th>Цена ₸</th><th>Склад</th><th>Бронь</th><th>Показ</th><th></th></tr>`+S.products.map(p=>`<tr><td><input value="${esc(p.name)}" onchange="upd('${esc(p.id)}',{name:this.value})"></td><td><select onchange="upd('${esc(p.id)}',{color:this.value})">${Object.entries(COL).map(([k,v])=>`<option value="${k}" ${k===p.color?'selected':''}>${v[0]}</option>`).join('')}</select></td><td><input type="number" min="0" value="${p.price}" onchange="upd('${esc(p.id)}',{price:Math.max(0,+this.value||0)})"></td><td><input type="number" min="0" value="${p.stock}" onchange="upd('${esc(p.id)}',{stock:Math.max(0,Math.floor(+this.value||0))})"></td><td>${reserved(p.id)}</td><td><input type="checkbox" ${p.active!==false?'checked':''} onchange="upd('${esc(p.id)}',{active:this.checked})"></td><td><button class="g" onclick="delp('${esc(p.id)}')">✕</button></td></tr>`).join('')+`</table></div><div class="row" style="margin-top:12px"><input id="np" placeholder="Новый товар"><select id="nc">${Object.entries(COL).map(([k,v])=>`<option value="${k}">${v[0]}</option>`).join('')}</select><button onclick="newp()">Добавить</button></div><p class="mu">Склад — физический остаток. Бронь — сколько зарезервировано активными заказами. Когда заказ получает статус «Выдана», склад уменьшается автоматически.</p>`;
+  }
+}
+const T=()=>{try{return localStorage.getItem('jt')||''}catch(e){return ''}};
+async function api(p,body){const h={'content-type':'application/json'};if(T())h.authorization='Bearer '+T();
+  const r=await fetch('/api/'+p,{method:body?'POST':'GET',headers:h,body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(j.error||'Ошибка '+r.status),{status:r.status});return j}
+async function loadState(){try{S.products=(await api('state')).products;S.err=''}catch(e){S.err='Не удалось загрузить каталог'}S.loaded=true}
+async function loadOrders(){if(!S.admin)return;try{S.orders=await api('orders')}catch(e){if(e.status===401)logout()}}
+async function refresh(){await Promise.all([loadState(),loadOrders()]);const f=document.activeElement;if(!f||!/INPUT|TEXTAREA|SELECT/.test(f.tagName))view()}
+async function login(){const e=$('le');try{const r=await api('login',{password:$('lp').value});localStorage.setItem('jt',r.token);S.admin=true;await loadOrders();view()}catch(x){e.innerHTML=`<div class="err">${esc(x.message)}</div>`}}
+function logout(){try{localStorage.removeItem('jt')}catch(e){}S.admin=false;S.orders=[];go('');view()}
+async function upd(id,d){try{await api('product',{op:'upsert',product:{id,...d}});await refresh();view()}catch(e){alert(e.message)}}
+async function delp(id){if(confirm('Удалить товар?'))try{await api('product',{op:'delete',product:{id}});await refresh();view()}catch(e){alert(e.message)}}
+async function newp(){const n=$('np').value.trim();if(!n)return;try{await api('product',{op:'upsert',product:{name:n,color:$('nc').value,price:1500,stock:0}});await refresh();view()}catch(e){alert(e.message)}}
+async function seed(){}
+async function setSt(code,st){try{await api('status',{code,status:st});await refresh();view()}catch(e){alert(e.message)}}
+(async()=>{S.admin=!!T();view();await refresh();view();if(S.admin)await loadOrders();view();setInterval(refresh,10000)})();
+</script></body></html>
